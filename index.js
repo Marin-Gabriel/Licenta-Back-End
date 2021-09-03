@@ -1,7 +1,6 @@
 const Express = require('express')
 const multer = require('multer')
 const bodyParser = require('body-parser')
-const fs = require('fs')
 const mongoose = require('mongoose')
 const User = require('./models/user')
 const ImageSet = require('./models/imageSet')
@@ -52,38 +51,6 @@ app.get('/',validateToken, (req, res) => {
   res.status(200).send('You can post to /api/upload.')
 })
 
-app.post('/hashing', (req, res) => {
-bcrypt.genSalt(10,function(err,salt){
-  bcrypt.hash(req.body.password,salt,function(err,hash){
-    if(err)
-    {
-      res.status(400).send('You fucked up')
-    }
-    else
-    {
-      res.status(200).send(hash)
-    }
-  })
-})
-})
-
-app.post('/hashingCheck', (req, res) => {
-bcrypt.compare('Kratos',req.body.hash,function(err,result){
-  if(err)
-  {
-    res.status(400).send('You fucked up')
-  }
-  else if(result)
-  {
-    res.status(200).send('Kratos')
-  }
-  else
-  {
-    res.status(400).send('Nah bruh')
-  }
-})
-})
-
 const findMaxSetId = async function (UID) {
   try{
     return await ImageSet.find({UID:UID})
@@ -130,8 +97,7 @@ const deleteImageSet = async function (UID,setId){
 app.get('/api/getImages',validateToken,(req,res)=>{
   let UID = req.UID
   findImageSets(UID).then(function(result){
-    if(result.length>0)
-    {
+    if(result.length>0){
       var arr = []
       result.forEach(element => arr.push({image:'data:image/png;base64,'+element.originalBase64Data,processedImage:'data:image/png;base64,'+element.processedBase64Data,key:element.setId.toString()}));
       res.status(200).send(arr)
@@ -160,7 +126,6 @@ app.delete('/api/delete',validateToken, (req, res) => {
         }
       })
       .catch((err) => {
-        console.log(err);
         res.status(500)
       });
     }
@@ -168,71 +133,48 @@ app.delete('/api/delete',validateToken, (req, res) => {
     {
       res.status(404)
     }
-  }
-  )
+  })
 })
 
 app.delete('/api/discard',validateToken, (req, res) => {
-  console.log('Discard')
   let UID = req.UID
   findMaxSetId(UID).then(function(resultFind){
       if(resultFind.length>0){
-      deleteImageSet(UID,resultFind[0].setId).then(function(resultDelete){
-        if(resultDelete.deletedCount==1){
-          res.status(200).send(JSON.stringify({deleted:true}))
-        }
-        else{
-          res.status(200).send(JSON.stringify({deleted:false}))
-        }
-      })
-      .catch((err) => {
-        console.log(err);
-        res.status(500)
-      });
-    }
-    else
-    {
-      res.status(200).send(JSON.stringify({deleted:false}))
-    }
-})
-})
-
-app.post('/loginTest', (req, res) => {
-console.log(process.env.TOKEN_SECRET)
-  User.find({username: req.body.username,password: req.body.password},(err,user) =>{
-    if(err) {
-      res.status(500)
-    }
-    if(user.length)
-    {
-      console.log(user)
-      const UID = { UID: user[0].UID}
-      const accessToken = jwt.sign(UID,process.env.TOKEN_SECRET)
-      res.status(200).send(JSON.stringify({accessToken : accessToken}))
-    }
-    else
-    {
-    res.status(404).send(JSON.stringify({ok:false}))
-    }
+        deleteImageSet(UID,resultFind[0].setId).then(function(resultDelete){
+          if(resultDelete.deletedCount==1){
+            res.status(200).send(JSON.stringify({deleted:true}))
+          }
+          else{
+            res.status(200).send(JSON.stringify({deleted:false}))
+          }
+        })
+        .catch((err) => {
+          res.status(500)
+        });
+      }
+      else
+      {
+        res.status(200).send(JSON.stringify({deleted:false}))
+      }
+    })
   })
-})
-
-app.get('/verifyToken',validateToken,(req,res)=>{
-  console.log(req.UID)
-  res.status(200).send(req.UID)
-})
 
 function validateToken(req,res,next){
+
   const authorizationHeader = req.headers['authorization']
   const token = authorizationHeader && authorizationHeader.split(' ')[1]
-  if(token == null ) return res.sendStatus(401)
+
+  if(token == null ){
+    return res.sendStatus(401)
+  }
 
   jwt.verify(token,process.env.TOKEN_SECRET,(err,uid) => {
-    if(err) return res.sendStatus(403)  
+    if(err) {
+      return res.sendStatus(403)
+    }  
     req.UID = uid.UID
     next()
   })
-
 }
 
 app.post('/login', (req, res) => {
@@ -241,49 +183,40 @@ app.post('/login', (req, res) => {
     if(err) {
       res.status(500)
     }
-    if(user.length)
-    {
-      console.log(user)
+    if(user.length){
       bcrypt.compare(req.body.password,user[0].password,function(err,result){
-        if(err)
-        {
+        if(err){
           res.status(500)
         }
-        else if(result)
-        {
+        else if(result){
           const UID = { UID: user[0].UID}
           const accessToken = jwt.sign(UID,process.env.TOKEN_SECRET)
-          res.status(200).send(JSON.stringify({accessToken : accessToken}))
+          res.status(200).send(JSON.stringify({accessToken : accessToken,ok:true}))
         }
-        else
-        {
+        else{
           res.status(404).send(JSON.stringify({ok:false}))
         }
       })
     }
-    else
-    {
+    else{
     res.status(404).send(JSON.stringify({ok:false}))
     }
   })
 })
 
 app.post('/register', (req, res) => {
-  console.log('register')
-  console.log(req.body)
+
   User.find({username: req.body.username},(err,user) =>{
-    if(err) {
-      res.status(500)}
-    if(user.length)
-    {
+    if(err){
+      res.status(500)
+    }
+    if(user.length){
       res.status(409).send(JSON.stringify({ok:false}))
     }
-    else
-    {
+    else{
       bcrypt.genSalt(10,function(err,salt){
         bcrypt.hash(req.body.password,salt,function(err,hash){
-          if(err)
-          {
+          if(err){
             res.status(500)
           }
           else{
@@ -297,122 +230,70 @@ app.post('/register', (req, res) => {
               res.status(201).send(JSON.stringify({ok:true}))
             })
             .catch((err) => {
-              console.log(err);
               res.status(500)
             });
           }
+        })
       })
-    })
     }
   })
 })
 
-app.post('/api/save',(req,res)=>{
-
-  originalOk=true
-  processedOk=true
-
-  const original = new Image({
-    UID:uuidv4(),
-    setId:1,
-    base64Data:req.original,
-    original:true
-  });
-
-  const processed = new Image({
-    UID:uuidv4(),
-    setId:1,
-    base64Data:req.processed,
-    original:true
-  });
-
-  original.save()
-    .catch((err) => {
-      originalOk=false
-    });
-
-  processed.save()
-    .catch((err) => {
-      processedOk=false
-    });
-
-  if(originalOk && processedOk)
-  {
-    res.status(200)
-  }
-  else
-  {
-    res.status(500)
-  }
-
-})
-
 app.post('/api/upload',validateToken, upload.array('photo', 3), (req, res) => {
 
-  console.log("Primit")
+  const start = Date.now()
   var tesseractResult='';
   var originalBase64='';
-  const spawn = require('child_process').spawn
 
+  const spawn = require('child_process').spawn
   const imageToBase64=spawn('python',['imageToBase64.py',req.files[0].filename])
-  
   imageToBase64.stdout.on('data',(chunk)=>{
     originalBase64+=chunk;
   });
-  imageToBase64.on('exit', () => {
-    fs.writeFile('demofile2.txt', originalBase64,function (err) {
-      if (err) return console.log(err)});
-    })
 
   const python=spawn('python',['Tesseract2.7.py',req.files[0].filename,req.body.language])
-
   python.stdout.on('data',(chunk)=>{
     tesseractResult+=chunk;
   });
-    python.on('exit', () => {
-    fs.writeFile('tesseractResult.txt', tesseractResult,function (err) {
-      if (err) return console.log(err)});
+  python.on('exit', () => {
 
-      findMaxSetId(req.UID).then(function(result){
-        if(result.length>0){
-          //res.status(200).send(JSON.stringify({maxId:result[0].setId}))
-          const imageSet = new ImageSet({
-            UID:req.UID,
-            setId:result[0].setId+1,
-            originalBase64Data:originalBase64,
-            processedBase64Data:tesseractResult
-          });
+    findMaxSetId(req.UID).then(function(result){
+      if(result.length>0){
+        const imageSet = new ImageSet({
+          UID:req.UID,
+          setId:result[0].setId+1,
+          originalBase64Data:originalBase64,
+          processedBase64Data:tesseractResult
+        });
 
-          imageSet.save()
-          .catch((err) => {console.log(err)}
-          );
+        imageSet.save()
+        .catch((err) => {console.log(err)});
 
-          res.status(200).json({
-            message: tesseractResult,
-            newImageSet:{image:'data:image/png;base64,'+originalBase64,processedImage:'data:image/png;base64,'+tesseractResult,key:(result[0].setId+1).toString()}
-          })
-        }
-        else
-        {
-          const imageSet = new ImageSet({
-            UID:req.UID,
-            setId:0,
-            originalBase64Data:originalBase64,
-            processedBase64Data:tesseractResult
-          });
+        res.status(200).json({
+          message: tesseractResult,
+          newImageSet:{image:'data:image/png;base64,'+originalBase64,processedImage:'data:image/png;base64,'+tesseractResult,key:(result[0].setId+1).toString()}
+        })
+      }
+      else
+      {
+        const imageSet = new ImageSet({
+          UID:req.UID,
+          setId:0,
+          originalBase64Data:originalBase64,
+          processedBase64Data:tesseractResult
+        });
 
-          imageSet.save()
-          .catch((err) => {console.log(err)}
-          );
-          res.status(200).json({
-            message: tesseractResult,
-            newImageSet:{image:'data:image/png;base64,'+originalBase64,processedImage:'data:image/png;base64,'+tesseractResult,key:'0'}
-          })
-        }
-      })
+        imageSet.save()
+        .catch((err) => {console.log(err)});
 
-      console.log("Trimis")
-
+        res.status(200).json({
+          message: tesseractResult,
+          newImageSet:{image:'data:image/png;base64,'+originalBase64,processedImage:'data:image/png;base64,'+tesseractResult,key:'0'}
+        })
+      }
+    })
+    const stop = Date.now()
+    console.log(`Timp de procesare = ${(stop - start)/1000} secunde`);
   })
 })
 
